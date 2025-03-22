@@ -28,8 +28,9 @@ interface User {
 }
 
 // Create Supabase client with mock data for development
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://example.supabase.co";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "your-anon-key";
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://example.supabase.co";
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "your-anon-key";
+
 
 
 // Create a mock Supabase client if real credentials aren't available
