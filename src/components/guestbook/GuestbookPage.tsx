@@ -88,6 +88,38 @@ export default function GuestbookPage() {
 
   // Check if user is authenticated
   useEffect(() => {
+    // Handle hash fragment from OAuth redirect
+    const handleHashParams = async () => {
+      // Check if we have a hash in the URL (from OAuth redirect)
+      if (
+        window.location.hash &&
+        window.location.hash.includes("access_token")
+      ) {
+        // Let Supabase handle the hash params
+        const { data, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error("Error getting session:", error);
+        }
+
+        // Remove the hash to clean up the URL
+        window.location.hash = "";
+
+        // If we have a session, set the user
+        if (data.session) {
+          const { user } = data.session;
+          setUser({
+            id: user.id,
+            name:
+              user.user_metadata.user_name ||
+              user.user_metadata.preferred_username ||
+              "Anonymous",
+            avatar_url: user.user_metadata.avatar_url || "",
+          });
+        }
+      }
+    };
+
     const checkUser = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
@@ -104,7 +136,8 @@ export default function GuestbookPage() {
       setLoading(false);
     };
 
-    checkUser();
+    // First handle any hash params, then check the user
+    handleHashParams().then(checkUser);
 
     // Set up auth state listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -196,12 +229,16 @@ export default function GuestbookPage() {
       return;
     }
 
-    await supabase.auth.signInWithOAuth({
-      provider: "github",
-      options: {
-        redirectTo: window.location.href,
-      },
-    });
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider: "github",
+        options: {
+          redirectTo: window.location.origin + window.location.pathname,
+        },
+      });
+    } catch (error) {
+      console.error("Error signing in with GitHub:", error);
+    }
   };
 
   // Sign out
