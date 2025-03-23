@@ -1,6 +1,6 @@
 # React + TypeScript + Vite + Login Github Test
 ---
-## Addition of My Portfolio Guestbook page V2 - NextJS
+## Addition Guestbook page of My Portfolio V2 - NextJS
 
 ### I added it here 
 
