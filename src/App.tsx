@@ -8,14 +8,18 @@ function App() {
   return (
     <Suspense fallback={<p>Loading...</p>}>
       <>
+        {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/guestbook" element={<GuestbookPage />} />
           <Route path="/guestbook/*" element={<GuestbookPage />} />
-          {/* Add a catch-all route to handle authentication redirects */}
+          {/* Add Tempo routes before the catch-all */}
+          {import.meta.env.VITE_TEMPO === "true" && (
+            <Route path="/tempobook/*" />
+          )}
+          {/* Catch-all route now points to GuestbookPage for /guestbook paths */}
           <Route path="*" element={<Home />} />
         </Routes>
-        {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
       </>
     </Suspense>
   );
