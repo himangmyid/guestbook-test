@@ -27,9 +27,13 @@ interface User {
   avatar_url: string;
 }
 
-// Create Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://example.supabase.co";
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "your-anon-key";
+// Create Supabase client with mock data for development
+const supabaseUrl =
+  import.meta.env.VITE_SUPABASE_URL || "https://example.supabase.co";
+const supabaseAnonKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY || "your-anon-key";
+
+// Create a mock Supabase client if real credentials aren't available
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Array of Tailwind color classes for usernames
@@ -54,19 +58,51 @@ export default function GuestbookPage() {
   const [submitting, setSubmitting] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "likes">("newest");
 
+  // Mock data for development when Supabase isn't configured
+  const mockEntries = [
+    {
+      id: "1",
+      created_at: new Date().toISOString(),
+      user_id: "mock-user-1",
+      message:
+        "This is a sample message in the guestbook. Connect Supabase to see real data!",
+      user_name: "Demo User",
+      user_avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=demo",
+      likes: 5,
+      color_class: "text-blue-400",
+      liked_by_current_user: false,
+    },
+    {
+      id: "2",
+      created_at: new Date(Date.now() - 86400000).toISOString(),
+      user_id: "mock-user-2",
+      message: "Great portfolio! Looking forward to seeing more of your work.",
+      user_name: "Sample Visitor",
+      user_avatar_url:
+        "https://api.dicebear.com/7.x/avataaars/svg?seed=visitor",
+      likes: 3,
+      color_class: "text-purple-400",
+      liked_by_current_user: true,
+    },
+  ];
+
   // Check if user is authenticated
   useEffect(() => {
+    // Handle hash fragment from OAuth redirect
     const handleHashParams = async () => {
-      if (window.location.hash && window.location.hash.includes("access_token")) {
+      // Check if we have a hash in the URL (from OAuth redirect)
+      if (
+        window.location.hash &&
+        window.location.hash.includes("access_token")
+      ) {
+        // Let Supabase handle the hash params
         const { data, error } = await supabase.auth.getSession();
 
         if (error) {
           console.error("Error getting session:", error);
         }
 
-        // Clean up the URL
-        window.location.hash = "";
-
+        // If we have a session, set the user
         if (data.session) {
           const { user } = data.session;
           setUser({
@@ -77,6 +113,18 @@ export default function GuestbookPage() {
               "Anonymous",
             avatar_url: user.user_metadata.avatar_url || "",
           });
+
+          // After setting user, remove the hash to clean up the URL
+          // Use history API instead of directly modifying location.hash
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState(
+              null,
+              document.title,
+              window.location.pathname,
+            );
+          } else {
+            window.location.hash = "";
+          }
         }
       }
     };
@@ -97,6 +145,7 @@ export default function GuestbookPage() {
       setLoading(false);
     };
 
+    // First handle any hash params, then check the user
     handleHashParams().then(checkUser);
 
     // Set up auth state listener
@@ -114,7 +163,7 @@ export default function GuestbookPage() {
         } else {
           setUser(null);
         }
-      }
+      },
     );
 
     return () => {
@@ -124,31 +173,41 @@ export default function GuestbookPage() {
 
   // Fetch guestbook entries
   useEffect(() => {
+    // Check if we're using mock data (no Supabase credentials)
+    const usingMockData = supabaseUrl === "https://example.supabase.co";
+
+    if (usingMockData) {
+      console.log("Using mock data - Supabase credentials not configured");
+      setEntries(mockEntries);
+      setLoading(false);
+      return;
+    }
+
     const fetchEntries = async () => {
       setLoading(true);
 
-      try {
-        // Get current user's likes
-        let userLikes: string[] = [];
-        if (user) {
-          const { data: likesData } = await supabase
-            .from("guestbook_likes")
-            .select("entry_id")
-            .eq("user_id", user.id);
+      // Get current user's likes
+      let userLikes: string[] = [];
+      if (user) {
+        const { data: likesData } = await supabase
+          .from("guestbook_likes")
+          .select("entry_id")
+          .eq("user_id", user.id);
 
-          userLikes = likesData?.map((like) => like.entry_id) || [];
-        }
+        userLikes = likesData?.map((like) => like.entry_id) || [];
+      }
 
-        // Get entries
-        const { data, error } = await supabase
-          .from("guestbook_entries")
-          .select("*")
-          .order(sortBy === "newest" ? "created_at" : "likes", {
-            ascending: false,
-          });
+      // Get entries
+      const { data, error } = await supabase
+        .from("guestbook_entries")
+        .select("*")
+        .order(sortBy === "newest" ? "created_at" : "likes", {
+          ascending: false,
+        });
 
-        if (error) throw error;
-
+      if (error) {
+        console.error("Error fetching entries:", error);
+      } else if (data) {
         // Map entries and add color class and liked status
         const mappedEntries = data.map((entry: any) => ({
           ...entry,
@@ -158,11 +217,9 @@ export default function GuestbookPage() {
         }));
 
         setEntries(mappedEntries);
-      } catch (error) {
-        console.error("Error fetching entries:", error);
-      } finally {
-        setLoading(false);
       }
+
+      setLoading(false);
     };
 
     fetchEntries();
@@ -170,11 +227,23 @@ export default function GuestbookPage() {
 
   // Sign in with GitHub
   const signInWithGitHub = async () => {
+    // Check if we're using mock data
+    if (supabaseUrl === "https://example.supabase.co") {
+      // Set a mock user when in development mode
+      setUser({
+        id: "mock-user-id",
+        name: "Mock GitHub User",
+        avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=github",
+      });
+      return;
+    }
+
     try {
       await supabase.auth.signInWithOAuth({
         provider: "github",
         options: {
-          redirectTo: window.location.origin + "/guestbook",
+          redirectTo:
+            "https://guestbook-test-himangs-projects.vercel.app/guestbook",
         },
       });
     } catch (error) {
@@ -184,34 +253,66 @@ export default function GuestbookPage() {
 
   // Sign out
   const signOut = async () => {
+    // Check if we're using mock data
+    if (supabaseUrl === "https://example.supabase.co") {
+      setUser(null);
+      return;
+    }
+
     await supabase.auth.signOut();
     setUser(null);
   };
 
   // Submit new entry
   const submitEntry = async (e: React.FormEvent) => {
+    // Check if we're using mock data
+    const usingMockData = supabaseUrl === "https://example.supabase.co";
+
     e.preventDefault();
 
     if (!user || !newMessage.trim()) return;
 
     setSubmitting(true);
 
-    try {
-      const { data, error } = await supabase
-        .from("guestbook_entries")
-        .insert([
-          {
-            user_id: user.id,
-            message: newMessage.trim(),
-            user_name: user.name,
-            user_avatar_url: user.avatar_url,
-            likes: 0,
-          },
-        ])
-        .select();
+    if (usingMockData) {
+      // Create a mock entry
+      const mockEntry = {
+        id: `mock-${Date.now()}`,
+        created_at: new Date().toISOString(),
+        user_id: user.id,
+        message: newMessage.trim(),
+        user_name: user.name,
+        user_avatar_url: user.avatar_url,
+        likes: 0,
+        color_class:
+          colorClasses[Math.floor(Math.random() * colorClasses.length)],
+        liked_by_current_user: false,
+      };
 
-      if (error) throw error;
+      // Add to entries
+      setEntries([mockEntry, ...entries]);
+      setNewMessage("");
+      setSubmitting(false);
+      return;
+    }
 
+    const { data, error } = await supabase
+      .from("guestbook_entries")
+      .insert([
+        {
+          user_id: user.id,
+          message: newMessage.trim(),
+          user_name: user.name,
+          user_avatar_url: user.avatar_url,
+          likes: 0,
+        },
+      ])
+      .select();
+
+    if (error) {
+      console.error("Error submitting entry:", error);
+    } else {
+      // Add the new entry to the list
       if (data && data[0]) {
         const newEntry = {
           ...data[0],
@@ -220,20 +321,67 @@ export default function GuestbookPage() {
           liked_by_current_user: false,
         };
 
-        setEntries([newEntry, ...entries]);
+        if (sortBy === "newest") {
+          setEntries([newEntry, ...entries]);
+        } else {
+          // If sorting by likes, fetch all entries again to get correct order
+          const { data: refreshedData } = await supabase
+            .from("guestbook_entries")
+            .select("*")
+            .order("likes", { ascending: false });
+
+          if (refreshedData) {
+            const mappedEntries = refreshedData.map((entry: any) => ({
+              ...entry,
+              color_class:
+                colorClasses[Math.floor(Math.random() * colorClasses.length)],
+              liked_by_current_user:
+                entry.id === newEntry.id
+                  ? false
+                  : entries.find((e) => e.id === entry.id)
+                      ?.liked_by_current_user || false,
+            }));
+
+            setEntries(mappedEntries);
+          }
+        }
+
         setNewMessage("");
       }
-    } catch (error) {
-      console.error("Error submitting entry:", error);
-    } finally {
-      setSubmitting(false);
     }
+
+    setSubmitting(false);
   };
 
   // Toggle like on an entry
   const toggleLike = async (entryId: string) => {
+    // Check if we're using mock data
+    const usingMockData = supabaseUrl === "https://example.supabase.co";
+
     if (!user) {
       signInWithGitHub();
+      return;
+    }
+
+    if (usingMockData) {
+      // Just update the UI for mock data
+      const entry = entries.find((e) => e.id === entryId);
+      if (!entry) return;
+
+      const isLiked = entry.liked_by_current_user;
+
+      setEntries(
+        entries.map((e) => {
+          if (e.id === entryId) {
+            return {
+              ...e,
+              likes: isLiked ? e.likes - 1 : e.likes + 1,
+              liked_by_current_user: !isLiked,
+            };
+          }
+          return e;
+        }),
+      );
       return;
     }
 
@@ -242,55 +390,49 @@ export default function GuestbookPage() {
 
     const isLiked = entry.liked_by_current_user;
 
-    // Optimistic update
-    setEntries((prevEntries) =>
-      prevEntries.map((e) =>
-        e.id === entryId
-          ? {
-              ...e,
-              likes: isLiked ? e.likes - 1 : e.likes + 1,
-              liked_by_current_user: !isLiked,
-            }
-          : e
-      )
+    // Optimistically update UI
+    setEntries(
+      entries.map((e) => {
+        if (e.id === entryId) {
+          return {
+            ...e,
+            likes: isLiked ? e.likes - 1 : e.likes + 1,
+            liked_by_current_user: !isLiked,
+          };
+        }
+        return e;
+      }),
     );
 
-    try {
-      if (isLiked) {
-        await supabase
-          .from("guestbook_likes")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("entry_id", entryId);
+    if (isLiked) {
+      // Remove like
+      await supabase
+        .from("guestbook_likes")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("entry_id", entryId);
 
-        await supabase
-          .from("guestbook_entries")
-          .update({ likes: entry.likes - 1 })
-          .eq("id", entryId);
-      } else {
-        await supabase
-          .from("guestbook_likes")
-          .insert([{ user_id: user.id, entry_id: entryId }]);
+      // Update entry like count
+      await supabase
+        .from("guestbook_entries")
+        .update({ likes: entry.likes - 1 })
+        .eq("id", entryId);
+    } else {
+      // Add like
+      await supabase
+        .from("guestbook_likes")
+        .insert([{ user_id: user.id, entry_id: entryId }]);
 
-        await supabase
-          .from("guestbook_entries")
-          .update({ likes: entry.likes + 1 })
-          .eq("id", entryId);
-      }
-    } catch (error) {
-      console.error("Error toggling like:", error);
-      // Rollback optimistic update
-      setEntries((prevEntries) =>
-        prevEntries.map((e) =>
-          e.id === entryId
-            ? {
-                ...e,
-                likes: isLiked ? e.likes + 1 : e.likes - 1,
-                liked_by_current_user: isLiked,
-              }
-            : e
-        )
-      );
+      // Update entry like count
+      await supabase
+        .from("guestbook_entries")
+        .update({ likes: entry.likes + 1 })
+        .eq("id", entryId);
+    }
+
+    // If sorting by likes, re-sort the entries
+    if (sortBy === "likes") {
+      setEntries([...entries].sort((a, b) => b.likes - a.likes));
     }
   };
 
@@ -406,7 +548,7 @@ export default function GuestbookPage() {
                               year: "numeric",
                               month: "short",
                               day: "numeric",
-                            }
+                            },
                           )}
                         </p>
                       </div>
