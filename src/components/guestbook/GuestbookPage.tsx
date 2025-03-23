@@ -95,36 +95,38 @@ export default function GuestbookPage() {
         window.location.hash &&
         window.location.hash.includes("access_token")
       ) {
-        // Let Supabase handle the hash params
-        const { data, error } = await supabase.auth.getSession();
+        try {
+          // Process the hash directly
+          const { data, error } = await supabase.auth.getSession();
 
-        if (error) {
-          console.error("Error getting session:", error);
-        }
+          if (error) {
+            console.error("Error getting session:", error);
+            return;
+          }
 
-        // If we have a session, set the user
-        if (data.session) {
-          const { user } = data.session;
-          setUser({
-            id: user.id,
-            name:
-              user.user_metadata.user_name ||
-              user.user_metadata.preferred_username ||
-              "Anonymous",
-            avatar_url: user.user_metadata.avatar_url || "",
-          });
+          // If we have a session, set the user
+          if (data.session) {
+            const { user } = data.session;
+            setUser({
+              id: user.id,
+              name:
+                user.user_metadata.user_name ||
+                user.user_metadata.preferred_username ||
+                "Anonymous",
+              avatar_url: user.user_metadata.avatar_url || "",
+            });
+          }
 
-          // After setting user, remove the hash to clean up the URL
-          // Use history API instead of directly modifying location.hash
+          // After processing, clean up the URL without reloading the page
           if (window.history && window.history.replaceState) {
             window.history.replaceState(
-              null,
+              {},
               document.title,
               window.location.pathname,
             );
-          } else {
-            window.location.hash = "";
           }
+        } catch (err) {
+          console.error("Error processing authentication:", err);
         }
       }
     };
@@ -243,7 +245,7 @@ export default function GuestbookPage() {
         provider: "github",
         options: {
           redirectTo:
-            "https://guestbook-test-himangs-projects.vercel.app/guestbook",
+            "https://guestbook-test-git-main-himangs-projects.vercel.app/guestbook",
         },
       });
     } catch (error) {
