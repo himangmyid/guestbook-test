@@ -4,7 +4,12 @@
 
 ### I added it here 
 
-https://github.com/himangmyid/portofolio-v2-nextjs
+---
+<p align="center">
+  <a href="https://github.com/himangmyid/portofolio-v2-nextjs">
+    <img src="https://github-readme-stats.vercel.app/api/pin/?username=himangmyid&repo=portofolio-v2-nextjs&theme=tokyonight" alt="GitHub Repo Card">
+  </a>
+</p>
 ---
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
