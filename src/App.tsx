@@ -11,6 +11,8 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/guestbook" element={<GuestbookPage />} />
+          {/* Add a catch-all route to handle authentication redirects */}
+          <Route path="*" element={<GuestbookPage />} />
         </Routes>
         {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
       </>
